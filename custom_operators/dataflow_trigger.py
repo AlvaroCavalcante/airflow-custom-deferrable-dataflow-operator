@@ -1,6 +1,7 @@
-from airflow.triggers.base import BaseTrigger, TriggerEvent, TaskSuccessEvent, TaskFailedEvent
-from google.cloud import dataflow_v1beta3
 import asyncio
+
+from airflow.triggers.base import BaseTrigger, TaskSuccessEvent, TaskFailedEvent
+from google.cloud import dataflow_v1beta3
 
 
 class DataflowTrigger(BaseTrigger):
@@ -11,7 +12,6 @@ class DataflowTrigger(BaseTrigger):
         self.body = body
 
     def serialize(self):
-        """Serialize the trigger for Airflow's triggerer."""
         return ("dataflow_trigger.DataflowTrigger", {
             "project_id": self.project_id,
             "region": self.region,
@@ -19,7 +19,6 @@ class DataflowTrigger(BaseTrigger):
         })
 
     async def run(self):
-        """Trigger logic to start the Dataflow job."""
         try:
             client = dataflow_v1beta3.FlexTemplatesServiceAsyncClient()
             request = dataflow_v1beta3.LaunchFlexTemplateRequest(
@@ -40,7 +39,6 @@ class DataflowTrigger(BaseTrigger):
                     )
                 )
                 if job.current_state == dataflow_v1beta3.JobState.JOB_STATE_DONE:
-                    # TriggerEvent({"status": "success", "jobId": job_id})
                     yield TaskSuccessEvent()
                     break
                 elif job.current_state in (
@@ -48,11 +46,8 @@ class DataflowTrigger(BaseTrigger):
                     dataflow_v1beta3.JobState.JOB_STATE_CANCELLED,
                     dataflow_v1beta3.JobState.JOB_STATE_UPDATED,
                 ):
-                    # TriggerEvent({"status": "error", "message": f"Job {job_id} failed with state {job.current_state}"})
                     yield TaskFailedEvent()
                     break
                 await asyncio.sleep(60)
-            # yield TriggerEvent({"status": "success", "jobId": response.job.id})
-        except Exception as e:
-            # TriggerEvent({"status": "error", "message": str(e)})
+        except Exception:
             yield TaskFailedEvent()
